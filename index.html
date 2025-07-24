@@ -7,95 +7,144 @@
   <style>
     body {
       font-family: sans-serif;
-      background: #111;
-      color: #fff;
+      background: #fff;
       margin: 0;
+      padding: 0;
+    }
+    .navbar {
+      background-color: #007a99;
+      padding: 10px 20px;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .navbar h1 {
+      margin: 0;
+      font-size: 1.5rem;
+    }
+    .navbar .controls {
+      display: flex;
+      gap: 10px;
+    }
+    .navbar .controls button,
+    .navbar .controls input {
+      padding: 6px 10px;
+      font-size: 1rem;
+      border: none;
+      border-radius: 4px;
+    }
+    .sheet {
+      display: flex;
+      flex-direction: column;
       padding: 20px;
     }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(64, 20px);
-      gap: 2px;
-      margin-bottom: 20px;
-    }
     .row {
-      display: contents;
-    }
-    .cell {
-      width: 20px;
-      height: 20px;
-      background: #222;
-      border: 1px solid #333;
-      cursor: pointer;
-    }
-    .cell.active {
-      background: #0cf;
-    }
-    .controls {
+      display: flex;
+      align-items: center;
       margin-bottom: 20px;
+      position: relative;
     }
-    button {
-      background: #0cf;
-      border: none;
-      padding: 10px 15px;
-      font-size: 1rem;
-      color: #000;
+    .measure {
+      display: flex;
+      border-right: 2px solid black;
+      margin-right: 8px;
+    }
+    .note {
+      width: 30px;
+      height: 60px;
+      border-left: 1px solid lightgray;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
-      margin-right: 10px;
     }
-    .indicator {
-      height: 2px;
-      background: #fff;
+    .note.active::before {
+      content: '';
+      width: 10px;
+      height: 10px;
+      background: currentColor;
+      border-radius: 50%;
+      display: block;
+    }
+    .player-color-0 { color: #f44336; }
+    .player-color-1 { color: #2196f3; }
+    .player-color-2 { color: #4caf50; }
+    .player-color-3 { color: #ff9800; }
+    .beat-line {
       position: absolute;
       top: 0;
-      left: 0;
+      bottom: 0;
+      width: 2px;
+      background: black;
       transition: left 0.05s;
     }
   </style>
 </head>
 <body>
-  <h1>Bass Drum Split Tool</h1>
-  <div class="controls">
-    <button id="playButton">Play</button>
-    <button id="stopButton">Stop</button>
+  <div class="navbar">
+    <h1>The Rhythm Randomizer</h1>
+    <div class="controls">
+      <button id="newRhythm">New Rhythm</button>
+      <button id="startPlayback">Start Playback</button>
+      <button id="startMetronome">Start Metronome</button>
+      <label>
+        BPM:
+        <input type="number" id="bpm" value="100" min="30" max="300" />
+      </label>
+    </div>
   </div>
-  <div class="grid" id="grid"></div>
+  <div class="sheet" id="sheet"></div>
   <script>
     const NUM_DRUMS = 4;
     const NUM_MEASURES = 4;
-    const BEATS_PER_MEASURE = 16;
-    const TOTAL_STEPS = NUM_MEASURES * BEATS_PER_MEASURE;
+    const BEATS_PER_MEASURE = 4;
+    const DIVISIONS_PER_BEAT = 4;
+    const TOTAL_STEPS = NUM_MEASURES * BEATS_PER_MEASURE * DIVISIONS_PER_BEAT;
 
-    const grid = document.getElementById('grid');
-    const playButton = document.getElementById('playButton');
-    const stopButton = document.getElementById('stopButton');
+    const sheet = document.getElementById("sheet");
+    const bpmInput = document.getElementById("bpm");
 
-    const pattern = Array.from({ length: NUM_DRUMS }, () => Array(TOTAL_STEPS).fill(false));
+    let pattern = Array.from({ length: NUM_DRUMS }, () => Array(TOTAL_STEPS).fill(false));
+    let beatLine;
 
-    // Create grid
-    for (let row = 0; row < NUM_DRUMS; row++) {
-      for (let col = 0; col < TOTAL_STEPS; col++) {
-        const cell = document.createElement('div');
-        cell.classList.add('cell');
-        cell.dataset.row = row;
-        cell.dataset.col = col;
-        cell.addEventListener('click', () => {
-          pattern[row][col] = !pattern[row][col];
-          cell.classList.toggle('active');
-        });
-        grid.appendChild(cell);
-      }
+    function renderSheet() {
+      sheet.innerHTML = "";
+      pattern.forEach((rowData, rowIndex) => {
+        const row = document.createElement("div");
+        row.className = `row player-color-${rowIndex}`;
+
+        for (let m = 0; m < NUM_MEASURES; m++) {
+          const measure = document.createElement("div");
+          measure.className = "measure";
+          for (let b = 0; b < BEATS_PER_MEASURE * DIVISIONS_PER_BEAT; b++) {
+            const index = m * BEATS_PER_MEASURE * DIVISIONS_PER_BEAT + b;
+            const note = document.createElement("div");
+            note.className = "note";
+            if (rowData[index]) note.classList.add("active");
+            note.addEventListener("click", () => {
+              pattern[rowIndex][index] = !pattern[rowIndex][index];
+              renderSheet();
+            });
+            measure.appendChild(note);
+          }
+          row.appendChild(measure);
+        }
+        sheet.appendChild(row);
+      });
+      beatLine = document.createElement("div");
+      beatLine.className = "beat-line";
+      sheet.appendChild(beatLine);
     }
 
-    // Audio playback
-    const context = new (window.AudioContext || window.webkitAudioContext)();
-    const pitchMap = [100, 120, 140, 160];
+    renderSheet();
 
-    function playHit(frequency) {
+    function playHit(rowIndex) {
+      const context = new (window.AudioContext || window.webkitAudioContext)();
       const osc = context.createOscillator();
       const gain = context.createGain();
-      osc.frequency.value = frequency;
-      osc.type = 'sine';
+      osc.frequency.value = 100 + rowIndex * 40;
       gain.gain.setValueAtTime(1, context.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.1);
       osc.connect(gain);
@@ -104,38 +153,58 @@
       osc.stop(context.currentTime + 0.1);
     }
 
+    let playing = false;
     let currentStep = 0;
-    let interval;
+    let intervalId;
 
-    function playLoop() {
-      interval = setInterval(() => {
-        for (let row = 0; row < NUM_DRUMS; row++) {
-          if (pattern[row][currentStep]) {
-            playHit(pitchMap[row]);
-          }
-        }
+    function startPlayback() {
+      const bpm = parseInt(bpmInput.value);
+      const stepTime = 60000 / bpm / DIVISIONS_PER_BEAT;
+      playing = true;
 
-        // Move visual playhead
-        document.querySelectorAll('.cell').forEach(cell => {
-          cell.style.borderColor = '#333';
+      intervalId = setInterval(() => {
+        pattern.forEach((rowData, rowIndex) => {
+          if (rowData[currentStep]) playHit(rowIndex);
         });
-        for (let r = 0; r < NUM_DRUMS; r++) {
-          const index = r * TOTAL_STEPS + currentStep;
-          grid.children[index].style.borderColor = '#fff';
-        }
+
+        const rowWidth = sheet.querySelector(".row").offsetWidth;
+        const stepX = (rowWidth / TOTAL_STEPS) * currentStep;
+        beatLine.style.left = stepX + "px";
 
         currentStep = (currentStep + 1) % TOTAL_STEPS;
-      }, 150); // ~100 BPM 16th notes
+      }, stepTime);
     }
 
-    playButton.addEventListener('click', () => {
-      context.resume();
-      playLoop();
+    function stopPlayback() {
+      clearInterval(intervalId);
+      currentStep = 0;
+    }
+
+    document.getElementById("startPlayback").addEventListener("click", () => {
+      stopPlayback();
+      startPlayback();
     });
 
-    stopButton.addEventListener('click', () => {
-      clearInterval(interval);
-      currentStep = 0;
+    document.getElementById("startMetronome").addEventListener("click", () => {
+      const context = new (window.AudioContext || window.webkitAudioContext)();
+      const interval = setInterval(() => {
+        const osc = context.createOscillator();
+        const gain = context.createGain();
+        osc.frequency.value = 800;
+        gain.gain.setValueAtTime(1, context.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.05);
+        osc.connect(gain);
+        gain.connect(context.destination);
+        osc.start();
+        osc.stop(context.currentTime + 0.05);
+      }, 60000 / parseInt(bpmInput.value));
+
+      setTimeout(() => clearInterval(interval), 8000); // stop after 8 seconds
+    });
+
+    document.getElementById("newRhythm").addEventListener("click", () => {
+      pattern = pattern.map(row => row.map(() => Math.random() > 0.75));
+      renderSheet();
     });
   </script>
 </body>
