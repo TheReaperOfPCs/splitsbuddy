@@ -1,211 +1,145 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bass Drum Split Tool</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      background: #fff;
-      margin: 0;
-      padding: 0;
-    }
-    .navbar {
-      background-color: #007a99;
-      padding: 10px 20px;
-      color: white;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .navbar h1 {
-      margin: 0;
-      font-size: 1.5rem;
-    }
-    .navbar .controls {
-      display: flex;
-      gap: 10px;
-    }
-    .navbar .controls button,
-    .navbar .controls input {
-      padding: 6px 10px;
-      font-size: 1rem;
-      border: none;
-      border-radius: 4px;
-    }
-    .sheet {
-      display: flex;
-      flex-direction: column;
-      padding: 20px;
-    }
-    .row {
-      display: flex;
-      align-items: center;
-      margin-bottom: 20px;
-      position: relative;
-    }
-    .measure {
-      display: flex;
-      border-right: 2px solid black;
-      margin-right: 8px;
-    }
-    .note {
-      width: 30px;
-      height: 60px;
-      border-left: 1px solid lightgray;
-      position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-    }
-    .note.active::before {
-      content: '';
-      width: 10px;
-      height: 10px;
-      background: currentColor;
-      border-radius: 50%;
-      display: block;
-    }
-    .player-color-0 { color: #f44336; }
-    .player-color-1 { color: #2196f3; }
-    .player-color-2 { color: #4caf50; }
-    .player-color-3 { color: #ff9800; }
-    .beat-line {
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      width: 2px;
-      background: black;
-      transition: left 0.05s;
-    }
-  </style>
-</head>
-<body>
-  <div class="navbar">
-    <h1>The Rhythm Randomizer</h1>
-    <div class="controls">
-      <button id="newRhythm">New Rhythm</button>
-      <button id="startPlayback">Start Playback</button>
-      <button id="startMetronome">Start Metronome</button>
-      <label>
-        BPM:
-        <input type="number" id="bpm" value="100" min="30" max="300" />
-      </label>
-    </div>
-  </div>
-  <div class="sheet" id="sheet"></div>
-  <script>
-    const NUM_DRUMS = 4;
-    const NUM_MEASURES = 4;
-    const BEATS_PER_MEASURE = 4;
-    const DIVISIONS_PER_BEAT = 4;
-    const TOTAL_STEPS = NUM_MEASURES * BEATS_PER_MEASURE * DIVISIONS_PER_BEAT;
+<script>
+  const NUM_DRUMS = 4;
+  const NUM_MEASURES = 4;
+  const BEATS_PER_MEASURE = 4;
+  const DIVISIONS_PER_BEAT = 4;
+  const TOTAL_STEPS = NUM_MEASURES * BEATS_PER_MEASURE * DIVISIONS_PER_BEAT;
 
-    const sheet = document.getElementById("sheet");
-    const bpmInput = document.getElementById("bpm");
+  const sheet = document.getElementById("sheet");
+  const bpmInput = document.getElementById("bpm");
 
-    let pattern = Array.from({ length: NUM_DRUMS }, () => Array(TOTAL_STEPS).fill(false));
-    let beatLine;
+  let pattern = Array.from({ length: NUM_DRUMS }, () =>
+    Array(TOTAL_STEPS).fill(false)
+  );
+  let beatLine;
 
-    function renderSheet() {
-      sheet.innerHTML = "";
-      pattern.forEach((rowData, rowIndex) => {
-        const row = document.createElement("div");
-        row.className = `row player-color-${rowIndex}`;
+  function renderSheet() {
+    sheet.innerHTML = "";
+    pattern.forEach((rowData, rowIndex) => {
+      const row = document.createElement("div");
+      row.className = `row player-color-${rowIndex}`;
 
-        for (let m = 0; m < NUM_MEASURES; m++) {
-          const measure = document.createElement("div");
-          measure.className = "measure";
-          for (let b = 0; b < BEATS_PER_MEASURE * DIVISIONS_PER_BEAT; b++) {
-            const index = m * BEATS_PER_MEASURE * DIVISIONS_PER_BEAT + b;
-            const note = document.createElement("div");
-            note.className = "note";
-            if (rowData[index]) note.classList.add("active");
-            note.addEventListener("click", () => {
-              pattern[rowIndex][index] = !pattern[rowIndex][index];
-              renderSheet();
-            });
-            measure.appendChild(note);
-          }
-          row.appendChild(measure);
+      for (let m = 0; m < NUM_MEASURES; m++) {
+        const measure = document.createElement("div");
+        measure.className = "measure";
+        for (let b = 0; b < BEATS_PER_MEASURE * DIVISIONS_PER_BEAT; b++) {
+          const index = m * BEATS_PER_MEASURE * DIVISIONS_PER_BEAT + b;
+          const note = document.createElement("div");
+          note.className = "note";
+          note.dataset.index = index;
+          note.dataset.row = rowIndex;
+          if (rowData[index]) note.classList.add("active");
+          note.addEventListener("click", () => {
+            pattern[rowIndex][index] = !pattern[rowIndex][index];
+            renderSheet();
+          });
+          measure.appendChild(note);
         }
-        sheet.appendChild(row);
-      });
-      beatLine = document.createElement("div");
-      beatLine.className = "beat-line";
-      sheet.appendChild(beatLine);
+        row.appendChild(measure);
+      }
+      sheet.appendChild(row);
+    });
+
+    beatLine = document.createElement("div");
+    beatLine.className = "beat-line";
+    beatLine.style.left = "0px";
+    sheet.appendChild(beatLine);
+  }
+
+  renderSheet();
+
+  function playHit(rowIndex) {
+    const context = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = context.createOscillator();
+    const gain = context.createGain();
+    osc.frequency.value = 100 + rowIndex * 40;
+    gain.gain.setValueAtTime(1, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.1);
+    osc.connect(gain);
+    gain.connect(context.destination);
+    osc.start();
+    osc.stop(context.currentTime + 0.1);
+  }
+
+  let animationId;
+  let playing = false;
+  let lastStep = -1;
+  let startTime = null;
+
+  function startPlayback() {
+    const bpm = parseInt(bpmInput.value);
+    const totalTime = (60000 / bpm / DIVISIONS_PER_BEAT) * TOTAL_STEPS;
+    const rowWidth = sheet.querySelector(".row").offsetWidth;
+
+    playing = true;
+    startTime = performance.now();
+    lastStep = -1;
+
+    function animate(time) {
+      if (!playing) return;
+      const elapsed = time - startTime;
+      const progress = (elapsed % totalTime) / totalTime;
+      const currentStep = Math.floor(progress * TOTAL_STEPS);
+      const playheadX = progress * rowWidth;
+      beatLine.style.left = playheadX + "px";
+
+      if (currentStep !== lastStep) {
+        pattern.forEach((rowData, rowIndex) => {
+          if (rowData[currentStep]) {
+            playHit(rowIndex);
+
+            // Animate note
+            const selector = `.note[data-index="${currentStep}"][data-row="${rowIndex}"]`;
+            const note = document.querySelector(selector);
+            if (note) {
+              note.style.transform = "scale(1.5)";
+              setTimeout(() => {
+                note.style.transform = "scale(1)";
+              }, 100);
+            }
+          }
+        });
+        lastStep = currentStep;
+      }
+
+      animationId = requestAnimationFrame(animate);
     }
 
-    renderSheet();
+    animationId = requestAnimationFrame(animate);
+  }
 
-    function playHit(rowIndex) {
-      const context = new (window.AudioContext || window.webkitAudioContext)();
+  function stopPlayback() {
+    playing = false;
+    cancelAnimationFrame(animationId);
+    beatLine.style.left = "0px";
+  }
+
+  document.getElementById("startPlayback").addEventListener("click", () => {
+    stopPlayback();
+    startPlayback();
+  });
+
+  document.getElementById("startMetronome").addEventListener("click", () => {
+    const context = new (window.AudioContext || window.webkitAudioContext)();
+    const interval = setInterval(() => {
       const osc = context.createOscillator();
       const gain = context.createGain();
-      osc.frequency.value = 100 + rowIndex * 40;
+      osc.frequency.value = 800;
       gain.gain.setValueAtTime(1, context.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.1);
+      gain.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.05);
       osc.connect(gain);
       gain.connect(context.destination);
       osc.start();
-      osc.stop(context.currentTime + 0.1);
-    }
+      osc.stop(context.currentTime + 0.05);
+    }, 60000 / parseInt(bpmInput.value));
 
-    let playing = false;
-    let currentStep = 0;
-    let intervalId;
+    setTimeout(() => clearInterval(interval), 8000); // stop after 8 seconds
+  });
 
-    function startPlayback() {
-      const bpm = parseInt(bpmInput.value);
-      const stepTime = 60000 / bpm / DIVISIONS_PER_BEAT;
-      playing = true;
-
-      intervalId = setInterval(() => {
-        pattern.forEach((rowData, rowIndex) => {
-          if (rowData[currentStep]) playHit(rowIndex);
-        });
-
-        const rowWidth = sheet.querySelector(".row").offsetWidth;
-        const stepX = (rowWidth / TOTAL_STEPS) * currentStep;
-        beatLine.style.left = stepX + "px";
-
-        currentStep = (currentStep + 1) % TOTAL_STEPS;
-      }, stepTime);
-    }
-
-    function stopPlayback() {
-      clearInterval(intervalId);
-      currentStep = 0;
-    }
-
-    document.getElementById("startPlayback").addEventListener("click", () => {
-      stopPlayback();
-      startPlayback();
-    });
-
-    document.getElementById("startMetronome").addEventListener("click", () => {
-      const context = new (window.AudioContext || window.webkitAudioContext)();
-      const interval = setInterval(() => {
-        const osc = context.createOscillator();
-        const gain = context.createGain();
-        osc.frequency.value = 800;
-        gain.gain.setValueAtTime(1, context.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.05);
-        osc.connect(gain);
-        gain.connect(context.destination);
-        osc.start();
-        osc.stop(context.currentTime + 0.05);
-      }, 60000 / parseInt(bpmInput.value));
-
-      setTimeout(() => clearInterval(interval), 8000); // stop after 8 seconds
-    });
-
-    document.getElementById("newRhythm").addEventListener("click", () => {
-      pattern = pattern.map(row => row.map(() => Math.random() > 0.75));
-      renderSheet();
-    });
-  </script>
-</body>
-</html>
+  document.getElementById("newRhythm").addEventListener("click", () => {
+    pattern = pattern.map((row) =>
+      row.map(() => Math.random() > 0.75)
+    );
+    renderSheet();
+  });
+</script>
