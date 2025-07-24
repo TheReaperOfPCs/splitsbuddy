@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bass Drum Split Tool</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #111;
+      color: #fff;
+      margin: 0;
+      padding: 20px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(64, 20px);
+      gap: 2px;
+      margin-bottom: 20px;
+    }
+    .row {
+      display: contents;
+    }
+    .cell {
+      width: 20px;
+      height: 20px;
+      background: #222;
+      border: 1px solid #333;
+      cursor: pointer;
+    }
+    .cell.active {
+      background: #0cf;
+    }
+    .controls {
+      margin-bottom: 20px;
+    }
+    button {
+      background: #0cf;
+      border: none;
+      padding: 10px 15px;
+      font-size: 1rem;
+      color: #000;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+    .indicator {
+      height: 2px;
+      background: #fff;
+      position: absolute;
+      top: 0;
+      left: 0;
+      transition: left 0.05s;
+    }
+  </style>
+</head>
+<body>
+  <h1>Bass Drum Split Tool</h1>
+  <div class="controls">
+    <button id="playButton">Play</button>
+    <button id="stopButton">Stop</button>
+  </div>
+  <div class="grid" id="grid"></div>
+  <script>
+    const NUM_DRUMS = 4;
+    const NUM_MEASURES = 4;
+    const BEATS_PER_MEASURE = 16;
+    const TOTAL_STEPS = NUM_MEASURES * BEATS_PER_MEASURE;
+
+    const grid = document.getElementById('grid');
+    const playButton = document.getElementById('playButton');
+    const stopButton = document.getElementById('stopButton');
+
+    const pattern = Array.from({ length: NUM_DRUMS }, () => Array(TOTAL_STEPS).fill(false));
+
+    // Create grid
+    for (let row = 0; row < NUM_DRUMS; row++) {
+      for (let col = 0; col < TOTAL_STEPS; col++) {
+        const cell = document.createElement('div');
+        cell.classList.add('cell');
+        cell.dataset.row = row;
+        cell.dataset.col = col;
+        cell.addEventListener('click', () => {
+          pattern[row][col] = !pattern[row][col];
+          cell.classList.toggle('active');
+        });
+        grid.appendChild(cell);
+      }
+    }
+
+    // Audio playback
+    const context = new (window.AudioContext || window.webkitAudioContext)();
+    const pitchMap = [100, 120, 140, 160];
+
+    function playHit(frequency) {
+      const osc = context.createOscillator();
+      const gain = context.createGain();
+      osc.frequency.value = frequency;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(1, context.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.1);
+      osc.connect(gain);
+      gain.connect(context.destination);
+      osc.start();
+      osc.stop(context.currentTime + 0.1);
+    }
+
+    let currentStep = 0;
+    let interval;
+
+    function playLoop() {
+      interval = setInterval(() => {
+        for (let row = 0; row < NUM_DRUMS; row++) {
+          if (pattern[row][currentStep]) {
+            playHit(pitchMap[row]);
+          }
+        }
+
+        // Move visual playhead
+        document.querySelectorAll('.cell').forEach(cell => {
+          cell.style.borderColor = '#333';
+        });
+        for (let r = 0; r < NUM_DRUMS; r++) {
+          const index = r * TOTAL_STEPS + currentStep;
+          grid.children[index].style.borderColor = '#fff';
+        }
+
+        currentStep = (currentStep + 1) % TOTAL_STEPS;
+      }, 150); // ~100 BPM 16th notes
+    }
+
+    playButton.addEventListener('click', () => {
+      context.resume();
+      playLoop();
+    });
+
+    stopButton.addEventListener('click', () => {
+      clearInterval(interval);
+      currentStep = 0;
+    });
+  </script>
+</body>
+</html>
